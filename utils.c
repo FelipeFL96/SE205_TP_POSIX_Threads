@@ -22,6 +22,8 @@ long producer_period; // Period of producer (millis)
 struct timespec start_time;
 pthread_mutex_t resync_mutex;
 pthread_cond_t  resync_condvar;
+pthread_mutex_t delay_mutex;
+pthread_cond_t delay_condvar;
 
 void init_utils(){
   pthread_key_create(&task_info_key, NULL);
@@ -91,21 +93,9 @@ void add_millis_to_timespec (struct timespec * ts, long msec) {
 // Delay until an absolute time. Translate the absolute time into a
 // relative one and use nanosleep. This is incorrect (we fix that).
 void delay_until(struct timespec * deadline) {
-  struct timeval  tv_now;
-  struct timespec ts_now;
-  struct timespec ts_sleep;
-
-  gettimeofday(&tv_now, NULL);
-  TIMEVAL_TO_TIMESPEC(&tv_now, &ts_now);
-  ts_sleep.tv_nsec = deadline->tv_nsec - ts_now.tv_nsec;
-  ts_sleep.tv_sec = deadline->tv_sec - ts_now.tv_sec;
-  if (ts_sleep.tv_nsec < 0) {
-    ts_sleep.tv_nsec = 1E9 + ts_sleep.tv_nsec;
-    ts_sleep.tv_sec--;
-  }
-  if (ts_sleep.tv_sec < 0) return;
-  
-  nanosleep (&ts_sleep, NULL);
+  pthread_mutex_lock(&delay_mutex);
+  pthread_cond_timedwait(&delay_condvar, &delay_mutex, deadline);
+  pthread_mutex_unlock(&delay_mutex);
 }
 
 // Compute time elapsed from start time
