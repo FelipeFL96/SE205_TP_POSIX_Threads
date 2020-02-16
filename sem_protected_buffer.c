@@ -77,6 +77,7 @@ void * sem_protected_buffer_remove(protected_buffer_t * b){
   int    rc = -1;
   
   // Enforce synchronisation semantics using semaphores.
+  rc = sem_trywait(b->full_slots);
 
   if (rc != 0) {
     print_task_activity ("remove", d);
@@ -84,13 +85,16 @@ void * sem_protected_buffer_remove(protected_buffer_t * b){
   }
 
   // Enter mutual exclusion.
+  pthread_mutex_lock(&b->mutex);
   
   d = circular_buffer_get(b->buffer);
   print_task_activity ("remove", d);
 
   // Leave mutual exclusion.
+  pthread_mutex_unlock(&b->mutex);
 
   // Enforce synchronisation semantics using semaphores.
+  sem_post(b->empty_slots);
   
   return d;
 }
@@ -101,6 +105,7 @@ int sem_protected_buffer_add(protected_buffer_t * b, void * d){
   int rc = -1;
   
   // Enforce synchronisation semantics using semaphores.
+  rc = sem_trywait(b->empty_slots);
   
   if (rc != 0) {
     print_task_activity ("add", NULL);
@@ -108,13 +113,16 @@ int sem_protected_buffer_add(protected_buffer_t * b, void * d){
   }
 
   // Enter mutual exclusion.
+  pthread_mutex_lock(&b->mutex);
   
   circular_buffer_put(b->buffer, d);
   print_task_activity ("add", d);
   
   // Leave mutual exclusion.
+  pthread_mutex_unlock(&b->mutex);
 
   // Enforce synchronisation semantics using semaphores.
+  sem_post(b->full_slots);
   return 1;
 }
 
